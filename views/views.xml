@@ -1,0 +1,45 @@
+<odoo>
+  <data>
+   <record model="ir.ui.view" id="discuss_emoji_tree">
+   	<field name="name">Discuss Emoji List</field>
+   	<field name="model">discuss.emoji</field>
+   	<field name="arch" type="xml">
+   		<tree>
+   			<field name="emoji_name" />
+   			<field name="emoji_code" />
+   		</tree>
+   	</field>
+   </record>
+   
+    <record model="ir.ui.view" id="discuss_emoji_form">
+       <field name="name">Emoji Dashboard Form</field>
+       <field name="model">discuss.emoji</field>
+       <field name="type">form</field>
+       <field name="arch" type="xml">
+           <form string="Emoji Dashboard">
+               <sheet>
+               		<group>
+               			<field name="emoji_name" />
+               		</group>
+               		<group>
+               			<field name="emoji_code" />
+               		</group>
+               </sheet>
+           </form>
+       </field>
+   </record>
+   
+   <record model="ir.actions.act_window" id="discuss_emoji_list">
+   	<field name="name">Emoji Dashboard</field>
+   	<field name="res_model">discuss.emoji</field>
+   	<field name="view_mode">tree,form</field>
+   </record>
+  
+ 
+   
+   <menuitem name="Discuss Emoji" id="discuss_emoji.menu_root" />
+   <menuitem name="Emoji" id="discuss_emoji.menu" parent="discuss_emoji.menu_root"/>
+   <menuitem name="Emoji" id="discuss_emoji.emoji_menu" parent="discuss_emoji.menu"
+              action="discuss_emoji_list"/>
+  </data>
+</odoo>

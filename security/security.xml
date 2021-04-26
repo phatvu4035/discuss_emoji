@@ -1,0 +1,5 @@
+<odoo>
+	<record id="emoji_group_manager" model="res.groups">
+		<field name="name">Emoji Group Manager</field>
+	</record>
+</odoo>

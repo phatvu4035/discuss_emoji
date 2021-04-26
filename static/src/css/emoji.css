@@ -1,0 +1,156 @@
+.mbSmilesWrapper{
+  position:relative;
+  display:inline-block;
+  width: 100%;
+}
+
+.o_thread_message_content {
+	position: relative;
+}
+
+.show_discuss_emoji {
+	position: absolute;
+	top: 0;
+	right: 0;
+}
+
+.emoji-tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.emoji-tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -60px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.emoji-tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
+.emoji-tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+
+.icon-info {
+    padding: 5px;
+    border-radius: 15px;
+    background: #fff;
+	-webkit-box-shadow: 2px 2px 5px 0px rgba(0,0,0,0.75);
+	-moz-box-shadow: 2px 2px 5px 0px rgba(0,0,0,0.75);
+	box-shadow: 2px 2px 5px 0px rgba(0,0,0,0.75);
+}
+
+.emoticon-display {
+	display: inline-block;
+}
+
+span.user-count-wrapper {
+	font-size: 11px;
+}
+
+.emoji-dropped-detail {
+	list-style: none;
+	padding: 5px
+}
+
+.emoji-dropped-detail .emoji-drop-avatar {
+	margin-right: 10px;
+}
+
+.emoji-dropped-detail .emoji-drop-avatar img {
+	max-width: 20px !important;
+	border-radius: 50%;
+}
+
+.mbSmilesBox{
+  position:absolute;
+  background:#f3f3f3;
+  padding:5px;
+  -moz-box-shadow: #666666 1px 1px 6px;
+  -webkit-box-shadow: #666666 1px 1px 6px;
+  margin-top:-5px;
+  z-index:1001;
+  top: 0;
+}
+span.emoticon{
+  background-color:#f3f3f3;
+  display:block;
+  float:left;
+  width:25px;
+  height:25px;
+  cursor:pointer;
+  border-bottom:1px dotted #ccc;
+  border-right:1px dotted #ccc;
+  padding:3px;
+}
+span.emoticon:hover{
+  position:relative;
+  z-index:1;
+  background-color:#fff;
+  -moz-box-shadow: #666666 1px 1px 6px;
+  -webkit-box-shadow: #666666 1px 1px 6px;
+}
+
+span.mbSmilesButton img{
+    width:12px;
+    height:12px;
+	display:none;
+}
+span.mbSmilesButton{
+    position:absolute;
+    right:5px;
+    z-index:1000;
+}
+
+#render{
+  width:500px;
+  background:#f3f3f3;
+  padding:5px;
+  -moz-box-shadow: #666666 1px 1px 6px;
+  -webkit-box-shadow: #666666 1px 1px 6px;
+}
+#ta{
+  border:none;
+  width:500px;
+  height:20px;
+  padding:5px;
+  -moz-box-shadow: #666666 1px 1px 6px;
+}
+
+span.btn{
+  padding:5px;
+  margin:10px;
+  display:inline-block;
+  cursor:pointer;
+  font:12px/14px Arial, Helvetica, sans-serif;
+  color:#aaa;
+  background-color:#eee;
+  -moz-border-radius:10px;
+  -webkit-border-radius:10px;
+  -moz-box-shadow:#999 2px 0px 3px;
+  -webkit-box-shadow:#999 2px 0px 3px;
+}
+span.btn:hover{
+  background-color:#000;
+}

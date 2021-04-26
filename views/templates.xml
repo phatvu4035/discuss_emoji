@@ -1,0 +1,11 @@
+<odoo>
+    <data>
+		<template id="assets_backend" name="emoji assets" inherit_id="web.assets_backend">
+			<xpath expr="." position="inside">
+				<script type="text/javascript" src="/discuss_emoji/static/lib/jquery-emotionicons/jquery.mb.emoticons.js"></script>
+				<script type="text/javascript" src="/discuss_emoji/static/src/js/thread_widget.js"></script>
+				<link rel="stylesheet" type="text/scss" href="/discuss_emoji/static/src/css/emoji.css"/>
+			</xpath>
+		</template>
+    </data>
+</odoo>
