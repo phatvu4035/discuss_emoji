@@ -6,6 +6,7 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 	var time = require('web.time');
 	var Widget = require('web.Widget');
 	var session = require('web.session');
+	console.log(session);
 	
 	var QWeb = core.qweb;
 	var _t = core._t;
@@ -157,13 +158,19 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 	                self._updateTimestamps();
 	            }, 1000*60);
 	        }
+
+			console.log('render2')
 	
 	        this._renderMessageMailPopover(messages);
 	        if (thread.hasSeenFeature()) {
 	            this._renderMessageSeenPopover(thread, messages);
 	        }
 			this.getEmojiFromServer();
-			this.update_message_emoji_thread();
+			// Only render when current thread is not mailbox_inbox
+			if(this._currentThreadID != 'mailbox_inbox') {
+				this.update_message_emoji_thread();
+			}
+			
 			
 	    },
 		_onClickDiscussEmojiIcon: function(ev) {
@@ -187,12 +194,12 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 							icon_id = parseInt(icon_id);
 							// Get parent paragraph message id
 							var parent_paragraph_message = icon.parents('.o_thread_message.o_mail_discussion');
-							var patent_paragraph_message_id = parent_paragraph_message.attr('data-message-id');
-							patent_paragraph_message_id  = parseInt(patent_paragraph_message_id);
+							var parent_paragraph_message_id = parent_paragraph_message.attr('data-message-id');
+							parent_paragraph_message_id  = parseInt(parent_paragraph_message_id);
 							
 							// Get user drop emoji
 							var user_id = session.uid;
-							self.sendEmojiToServer(user_id, icon_id, patent_paragraph_message_id)
+							self.sendEmojiToServer(user_id, icon_id, parent_paragraph_message_id)
 						})
 					})
 				});
@@ -207,56 +214,39 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 		/*/
 		sendEmojiToServer: function(sent_user_id, emoji_id, message_id) {
 			var self = this;
+			var thread_id = self._currentThreadID;
 			// Check if user drop emoji for message
-			var vals = {
-				name: emoji_id + '-' +message_id + '-' + sent_user_id,
-				emoji_id: emoji_id,
-				message_id: message_id,
-				emoji_owner_id: sent_user_id
-			}
 			this._rpc({
                 model: self.emoji_message_model,
                 method: 'search_read',
                 fields: [ 'emoji_id', 'message_id', 'emoji_owner_id'],
 				domain: [['emoji_owner_id', '=', sent_user_id], ['message_id', '=', message_id], ['emoji_id', '=', emoji_id]]
             }).then(function(result) {
-				if(result.length > 0) {
+				if(result.length == 0) {
 					var vals = {
 						name: emoji_id + '-' +message_id + '-' + sent_user_id,
 						emoji_id: emoji_id,
 						message_id: message_id,
-						emoji_owner_id: sent_user_id
+						emoji_owner_id: sent_user_id,
+						channel_id: thread_id
 					}
-					this._rpc({
+					self._rpc({
 		                model: self.emoji_message_model,
 		                method: 'create',
 		                args: [vals],
 		            }).then(function() {
 						// Update value for message emoji archive
 						var emoji = self.emoji;
-						var message_id = message_id; // relational field
-						var emoji_id = emoji_id; // relational field
-						var emoji_icon = emoji[emoji_id];
+						var emoji_code = emoji[emoji_id];
 						var emoji_owner_id = sent_user_id; // relational field
 						var emoji_owner_name = session.name;
 						self.user_dropped_emoji[self.user_dropped_emoji.length] = emoji_owner_id;
 						
-						if(typeof self.message_emoji_archive[message_id] == 'undefined') {
-							var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name, image_url: base_url + '/web/image/res.users/'+ emoji_owner_id +'/image_128'};
-							self.message_emoji_archive[message_id] = {};
-							self.message_emoji_archive[message_id][emoji_icon] = [];
-							self.message_emoji_archive[message_id][emoji_icon][0] = user;
-						} else if(typeof self.message_emoji_archive[message_id][emoji_icon] == 'undefined') {
-							var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
-							self.message_emoji_archive[message_id][emoji_icon] = [];
-							self.message_emoji_archive[message_id][emoji_icon][0] = user;
-						} else {
-							var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
-							var emoji_message_len = self.message_emoji_archive[message_id][emoji_icon].length;
-							self.message_emoji_archive[message_id][emoji_icon][emoji_message_len] = user;
-						}
+						self.update_emoji_archive(message_id, emoji_code, emoji_owner_id, emoji_owner_name);
 						// Update emoji list for message
 						self.render_emoji_for_message(message_id);
+						
+						
 					})
 				}
 			})
@@ -270,15 +260,20 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 			this._rpc({
 				model: this.emoji_model,
 				method: 'search_read',
-				fields: [ 'emoji_name', 'emoji_code' ],
+				fields: [ 'emoji_name', 'emoji_code', 'id' ],
 				domain: []
 			}).then(function(result) {
 				smiles = {};
-				smiles_emoji_id = {}
+				smiles_emoji_id = {};
+				var emoji = [];
 				for(var i = 0; i < result.length; i++) {
 					smiles[result[i].emoji_code] = result[i].emoji_name;
 					smiles_emoji_id[result[i].emoji_code] = result[i].id;
+					var emoj_id = result[i].id;
+					emoji[emoj_id] = result[i].emoji_code;
 				}
+				self.emoji = emoji;
+				console.log(self.emoji);
 				self.smiles_emoji_id = smiles_emoji_id;
 				$.mbEmoticons.smiles = smiles;
 				$.mbEmoticons.smiles_emoji_id = smiles_emoji_id;
@@ -291,58 +286,31 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 		*/
 		update_message_emoji_thread: function() {
 			var self = this;
-			/*
-			* Get emoji for each message and store it in message_emoji_archive
-			*/
-			this._rpc({
-				model: self.emoji_model,
+			var thread_id = this._currentThreadID;
+			// Matching emoji id with emoji icon in array
+			self._rpc({
+				model: self.emoji_message_model,
 				method: 'search_read',
-				fields: [ 'id' ,'emoji_name', 'emoji_code' ],
-				domain: []
-			}).then(function(emoji_res) {
-				// Matching emoji id with emoji icon in array
-				var emoji = [];
-				for(var x  = 0; x < emoji_res.length; x++) {
-					var emoj_id = emoji_res[x].id;
-					emoji[emoj_id] = emoji_res[x].emoji_code;
+				fields: [ 'emoji_id', 'emoji_owner_id', 'message_id', 'channel_id'],
+				domain: [['channel_id', '=', thread_id]]
+			}).then(function(emoji_mes_result) {
+				var emoji = self.emoji;
+				// Reset value for message emoji archive
+				self.message_emoji_archive = {};
+				// Store message and emoji respectively in message_emoji_archive
+				for(var i = 0; i < emoji_mes_result.length; i++) {
+					var message_id = emoji_mes_result[i].message_id[0]; // relational field
+					var emoji_id = emoji_mes_result[i].emoji_id[0]; // relational field
+					var emoji_code = emoji[emoji_id];
+					var emoji_owner_id = emoji_mes_result[i].emoji_owner_id[0]; // relational field
+					var emoji_owner_name = emoji_mes_result[i].emoji_owner_id[1];
+					self.user_dropped_emoji[self.user_dropped_emoji.length] = emoji_owner_id;
+					
+					self.update_emoji_archive(message_id, emoji_code, emoji_owner_id, emoji_owner_name);
+					
 				}
-				self.emoji = emoji;
-				self._rpc({
-					model: self.emoji_message_model,
-					method: 'search_read',
-					fields: [ 'emoji_id', 'emoji_owner_id', 'message_id'],
-					domain: []
-				}).then(function(emoji_mes_result) {
-					// Reset value for message emoji archive
-					self.message_emoji_archive = {};
-					var base_url = session['web.base.url'];
-					// Store message and emoji respectively in message_emoji_archive
-					for(var i = 0; i < emoji_mes_result.length; i++) {
-						var message_id = emoji_mes_result[i].message_id[0]; // relational field
-						var emoji_id = emoji_mes_result[i].emoji_id[0]; // relational field
-						var emoji_icon = emoji[emoji_id];
-						var emoji_owner_id = emoji_mes_result[i].emoji_owner_id[0]; // relational field
-						var emoji_owner_name = emoji_mes_result[i].emoji_owner_id[1];
-						self.user_dropped_emoji[self.user_dropped_emoji.length] = emoji_owner_id;
-						if(typeof self.message_emoji_archive[message_id] == 'undefined') {
-							var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name, image_url: base_url + '/web/image/res.users/'+ emoji_owner_id +'/image_128'};
-							self.message_emoji_archive[message_id] = {};
-							self.message_emoji_archive[message_id][emoji_icon] = [];
-							self.message_emoji_archive[message_id][emoji_icon][0] = user;
-						} else if(typeof self.message_emoji_archive[message_id][emoji_icon] == 'undefined') {
-							var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
-							self.message_emoji_archive[message_id][emoji_icon] = [];
-							self.message_emoji_archive[message_id][emoji_icon][0] = user;
-						} else {
-							var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
-							var emoji_message_len = self.message_emoji_archive[message_id][emoji_icon].length;
-							self.message_emoji_archive[message_id][emoji_icon][emoji_message_len] = user;
-						}
-					}
-					self.render_emoji_for_message();
-				})
-			});
-			
+				self.render_emoji_for_message();
+			})
 		},
 		/**
 		* Render emoji to message
@@ -360,7 +328,6 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 					var emojis = self.message_emoji_archive[message_id];
 					for (emoji_code in emojis) {
 						// if when user drop emoji just update the only that message
-						console.log('update_message_id', update_message_id);
 						if(update_message_id && update_message_id != message_id ) {
 							continue;
 						}
@@ -404,14 +371,46 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 				
 				
 			} else {
-				setTimeout(function() {
+				self.emoji_message_timeout = setTimeout(function() {
 					self.render_emoji_for_message();
 				}, 200);
 			}
 		},
-		/*
-		* Tooltip to show detail users who drop emoji
+		/**
+		* @overwrite
 		*/
+		start: function() {
+			this._super.apply(this, arguments);
+		},
+		
+		/**
+		* @overwrite
+		*/
+		destroy: function() {
+			var self = this;
+			this._super.apply(this, arguments);
+			clearTimeout(self.emoji_message_timeout);
+		},
+		
+		// Render emoji for each message
+		update_emoji_archive: function(message_id, emoji_code, emoji_owner_id, emoji_owner_name) {
+			var self = this;
+			var base_url = session['web.base.url'];
+			if(typeof self.message_emoji_archive[message_id] == 'undefined') {
+				var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name, image_url: base_url + '/web/image/res.users/'+ emoji_owner_id +'/image_128'};
+				self.message_emoji_archive[message_id] = {};
+				self.message_emoji_archive[message_id][emoji_code] = [];
+				self.message_emoji_archive[message_id][emoji_code][0] = user;
+			} else if(typeof self.message_emoji_archive[message_id][emoji_code] == 'undefined') {
+				var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
+				self.message_emoji_archive[message_id][emoji_code] = [];
+				self.message_emoji_archive[message_id][emoji_code][0] = user;
+			} else {
+				var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
+				var emoji_message_len = self.message_emoji_archive[message_id][emoji_code].length;
+				self.message_emoji_archive[message_id][emoji_code][emoji_message_len] = user;
+			}
+		}
 		
 		
 	})

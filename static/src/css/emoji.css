@@ -74,8 +74,12 @@ span.user-count-wrapper {
 	padding: 5px
 }
 
+.emoji-dropped-detail li {
+	display: block;
+}
+
 .emoji-dropped-detail .emoji-drop-avatar {
-	margin-right: 10px;
+	margin-right: 5px;
 }
 
 .emoji-dropped-detail .emoji-drop-avatar img {

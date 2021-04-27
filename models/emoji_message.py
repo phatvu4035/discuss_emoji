@@ -7,3 +7,4 @@ class EmojiMessage(models.Model):
     emoji_id = fields.Many2one('discuss.emoji', ondelete='set null')
     message_id = fields.Many2one('mail.message', ondelete='cascade', required=True)
     emoji_owner_id = fields.Many2one('res.users', string='Emoji Owner', ondelete='cascade', required=True, auto_join=True, delegate=True)
+    channel_id = fields.Many2one('mail.channel', string='Channel Message', ondelete='cascade', required=True)
