@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+	<div t-name="discuss_emoji.Composer.emojis" class="o_mail_emoji_container">
+		<t t-foreach="emojis" t-as="emoji">
+            <span class="o_message_emoji" t-att-emoji-name="emoji.emoji_name" t-att-emoji-id="emoji.id">
+                <t t-raw="emoji.unicode"/>
+            </span>
+        </t>
+    </div>
+</templates>

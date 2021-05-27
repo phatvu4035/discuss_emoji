@@ -41,17 +41,26 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 	        'click .o_thread_message_moderation': '_onClickMessageModeration',
 	        'change .moderation_checkbox': '_onChangeModerationCheckbox',
 			/* Custom click for emoji */
-			'click .show_discuss_emoji': '_onClickDiscussEmojiIcon'
+			'click .show_discuss_emoji': '_onClickDiscussEmojiIcon',
+			'click .o_message_emoji': '_onClickSelectMessageEmojiIcon'
 	    },
 		emoji_message_model: 'discuss.emoji_message',
 		emoji_model: 'discuss.emoji',
 		// emoji for message archive
 		message_emoji_archive: {},
-		// Users dropped emoji
-		user_dropped_emoji: [],
 		
 		// emoji list
-		emoji: [],
+		emojis: [],
+		
+		isAttacheTrigger: false,
+		/**
+	     * Hides the emojis container.
+	     *
+	     * @private
+	     */
+	    _hideEmojis: function () {
+	        this._$emojisContainer.remove();
+	    },
 		 /**
 		 * @override 
 	     * @param {mail.model.AbstractThread} thread the thread to render.
@@ -159,7 +168,7 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 	            }, 1000*60);
 	        }
 
-			console.log('render2')
+			console.log('render2', this)
 	
 	        this._renderMessageMailPopover(messages);
 	        if (thread.hasSeenFeature()) {
@@ -170,44 +179,37 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 			if(this._currentThreadID != 'mailbox_inbox') {
 				this.update_message_emoji_thread();
 			}
-			
+			console.log('_currentThreadID', this._currentThreadID)
+			if(!this.isAttacheTrigger) {
+				this.call('mail_service', 'getMailBus').on('user_drop_emoji', this, this._onUserDropEmoji);
+				this.isAttacheTrigger = true;
+			}
 			
 	    },
 		_onClickDiscussEmojiIcon: function(ev) {
-			var mb_smile_wrapper = $(ev.target).next();
-			var emoji_left_pos = $(ev.target).position().left;
-
-			window.emoji_left_pos = emoji_left_pos;
-			$('.mbSmilesButton', mb_smile_wrapper).trigger('click');
-		},
-		addEmojiIcon: function() {
 			var self = this;
-			if($('.ta').length > 0) {
-				$('.ta').each(function(ind, elem) {
-					$(elem).mbSmilesBox();
-					// Attach click event to icon
-					var ta_wrapper = $(elem).parents('.mbSmilesWrapper');
-					$('.mbSmilesBox', ta_wrapper).find('.emoticon').each(function() {
-						$(this).click(function(e) {
-							var icon = $(e.target);
-							icon_id = icon.parent().attr('emoji-id');
-							icon_id = parseInt(icon_id);
-							// Get parent paragraph message id
-							var parent_paragraph_message = icon.parents('.o_thread_message.o_mail_discussion');
-							var parent_paragraph_message_id = parent_paragraph_message.attr('data-message-id');
-							parent_paragraph_message_id  = parseInt(parent_paragraph_message_id);
-							
-							// Get user drop emoji
-							var user_id = session.uid;
-							self.sendEmojiToServer(user_id, icon_id, parent_paragraph_message_id)
-						})
-					})
-				});
-			} else {
-				setTimeout(function() {
-					self.addEmojiIcon();
-				}, 200);
-			}
+			var mail_discussion = $(ev.target).parents('.o_mail_discussion');
+			if (!this._$emojisContainer) { // lazy rendering
+	            this._$emojisContainer = $(QWeb.render('discuss_emoji.Composer.emojis', {
+	                emojis: self.emojis,
+	            }));
+	        }
+	        if (this._$emojisContainer.parent().length) {
+	            this._hideEmojis();
+	        } else {
+	            this._$emojisContainer.appendTo($('.ta',mail_discussion));
+	        }
+		},
+		
+		_onClickSelectMessageEmojiIcon: function(ev) {
+			console.log('_onClickMessageEmojiIcon')
+			var target_icon = $(ev.target);
+			var emoji_id = target_icon.attr('emoji-id');
+			var message_id = target_icon.parents('.o_mail_discussion').data('message-id')
+			var user_id = session.uid;
+			console.log('user drop emoji', emoji_id, message_id, user_id)
+			this.sendEmojiToServer(user_id, emoji_id, message_id)
+			
 		},
 		/**
 		* This is when user drop emoji
@@ -222,10 +224,11 @@ odoo.define('discuss_emoji.thread_message', function(require) {
                 fields: [ 'emoji_id', 'message_id', 'emoji_owner_id'],
 				domain: [['emoji_owner_id', '=', sent_user_id], ['message_id', '=', message_id], ['emoji_id', '=', emoji_id]]
             }).then(function(result) {
+				console.log('result', result);
 				if(result.length == 0) {
 					var vals = {
 						name: emoji_id + '-' +message_id + '-' + sent_user_id,
-						emoji_id: emoji_id,
+						emoji_id: parseInt(emoji_id),
 						message_id: message_id,
 						emoji_owner_id: sent_user_id,
 						channel_id: thread_id
@@ -236,21 +239,21 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 		                args: [vals],
 		            }).then(function() {
 						// Update value for message emoji archive
-						var emoji = self.emoji;
+						var emojis = self.emojis;
+						var filtered_icons = emojis.filter(function(icon) {
+							return icon.id == emoji_id
+						});
+						emoji = filtered_icons[0];
 						var emoji_code = emoji[emoji_id];
 						var emoji_owner_id = sent_user_id; // relational field
 						var emoji_owner_name = session.name;
-						self.user_dropped_emoji[self.user_dropped_emoji.length] = emoji_owner_id;
 						
-						self.update_emoji_archive(message_id, emoji_code, emoji_owner_id, emoji_owner_name);
+						/*self.update_emoji_archive(message_id, emoji_id, emoji_owner_id, emoji_owner_name);
 						// Update emoji list for message
-						self.render_emoji_for_message(message_id);
-						
-						
+						self.render_emoji_for_message(message_id);*/
 					})
 				}
 			})
-			
 		},
 		/**
 		* Get emoji confied in server to re-update the available emoji
@@ -265,20 +268,19 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 			}).then(function(result) {
 				smiles = {};
 				smiles_emoji_id = {};
-				var emoji = [];
+				var emojis = [];
 				for(var i = 0; i < result.length; i++) {
 					smiles[result[i].emoji_code] = result[i].emoji_name;
 					smiles_emoji_id[result[i].emoji_code] = result[i].id;
 					var emoj_id = result[i].id;
-					emoji[emoj_id] = result[i].emoji_code;
+					emojis.push({
+						'unicode': result[i].emoji_code,
+						'id': emoj_id,
+						'emoji_name': result[i].emoji_name
+					});
 				}
-				self.emoji = emoji;
-				console.log(self.emoji);
+				self.emojis = emojis;
 				self.smiles_emoji_id = smiles_emoji_id;
-				$.mbEmoticons.smiles = smiles;
-				$.mbEmoticons.smiles_emoji_id = smiles_emoji_id;
-				// After get emoji from server, show it for user
-				self.addEmojiIcon();
 			});
 		},
 		/*
@@ -294,19 +296,25 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 				fields: [ 'emoji_id', 'emoji_owner_id', 'message_id', 'channel_id'],
 				domain: [['channel_id', '=', thread_id]]
 			}).then(function(emoji_mes_result) {
-				var emoji = self.emoji;
+				var emojis = self.emojis;
 				// Reset value for message emoji archive
 				self.message_emoji_archive = {};
 				// Store message and emoji respectively in message_emoji_archive
+				
 				for(var i = 0; i < emoji_mes_result.length; i++) {
 					var message_id = emoji_mes_result[i].message_id[0]; // relational field
 					var emoji_id = emoji_mes_result[i].emoji_id[0]; // relational field
-					var emoji_code = emoji[emoji_id];
-					var emoji_owner_id = emoji_mes_result[i].emoji_owner_id[0]; // relational field
-					var emoji_owner_name = emoji_mes_result[i].emoji_owner_id[1];
-					self.user_dropped_emoji[self.user_dropped_emoji.length] = emoji_owner_id;
+					for(var j = 0; j < emojis.length; j++) {
+						var emj = emojis[j]
+						var emj_id = emj.id;
+						if( emj_id == emoji_id) {
+							var emoji_owner_id = emoji_mes_result[i].emoji_owner_id[0]; // relational field
+							var emoji_owner_name = emoji_mes_result[i].emoji_owner_id[1];
+							self.update_emoji_archive(message_id, emoji_id, emoji_owner_id, emoji_owner_name);
+							break;
+						}
+					}
 					
-					self.update_emoji_archive(message_id, emoji_code, emoji_owner_id, emoji_owner_name);
 					
 				}
 				self.render_emoji_for_message();
@@ -326,20 +334,27 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 						$('.message_emojis_wrapper', parent).empty();
 					}
 					var emojis = self.message_emoji_archive[message_id];
-					for (emoji_code in emojis) {
+					console.log(message_id, self.message_emoji_archive)
+					for (emoji_id in emojis) {
 						// if when user drop emoji just update the only that message
 						if(update_message_id && update_message_id != message_id ) {
 							continue;
 						}
-						var emoji_tooltip = $('<div />').addClass('emoji-tooltip').attr('message-id', message_id).attr('emoji-code', emoji_code);
+						var filtered_icons = self.emojis.filter(function(icon) {
+							return icon.id == emoji_id
+						});	
+						emoji = filtered_icons[0];
+						var emoji_tooltip = $('<div />').addClass('emoji-tooltip').attr('message-id', message_id);
 						$('.message_emojis_wrapper', parent).append(emoji_tooltip);
-						var user_emoji_message = emojis[emoji_code];
-						var user_count = emojis[emoji_code].length;
+						var user_emoji_message = emojis[emoji_id];
+						var user_count = emojis[emoji_id].length;
 						// get image icon for emoji code
 						var emoji_code_wrapper = $("<span/>").addClass("emoticon-wrapper");
-						var emoticon=$("<span/>").addClass("emoticon-display").html(emoji_code).attr("title",emoji_code);
+						// get emoji code from emoji id
+						console.log('self.emojis', self.emojis)
+						
+						var emoticon=$("<span/>").addClass("emoticon-display").html(emoji.emoji_code).attr("title",emoji.emoji_name).text(emoji.unicode);
 						emoji_code_wrapper.append(emoticon);
-						emoticon.emoticonize().data("emoticon-display",emoji_code);
 						
 						var user_count_span = $("<span/>").addClass("user-count-wrapper").html(user_count);
 						
@@ -351,7 +366,6 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 						}
 						
 						// Extend tooltip
-						
 						var ul = $('<ul />').addClass('emoji-dropped-detail');
 						for(var j = 0; j <  user_emoji_message.length; j++) {
 							var image_url = user_emoji_message[j].image_url;
@@ -393,23 +407,31 @@ odoo.define('discuss_emoji.thread_message', function(require) {
 		},
 		
 		// Render emoji for each message
-		update_emoji_archive: function(message_id, emoji_code, emoji_owner_id, emoji_owner_name) {
+		update_emoji_archive: function(message_id, emoji_id, emoji_owner_id, emoji_owner_name) {
 			var self = this;
 			var base_url = session['web.base.url'];
 			if(typeof self.message_emoji_archive[message_id] == 'undefined') {
 				var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name, image_url: base_url + '/web/image/res.users/'+ emoji_owner_id +'/image_128'};
 				self.message_emoji_archive[message_id] = {};
-				self.message_emoji_archive[message_id][emoji_code] = [];
-				self.message_emoji_archive[message_id][emoji_code][0] = user;
-			} else if(typeof self.message_emoji_archive[message_id][emoji_code] == 'undefined') {
+				self.message_emoji_archive[message_id][emoji_id] = [];
+				self.message_emoji_archive[message_id][emoji_id][0] = user;
+			} else if(typeof self.message_emoji_archive[message_id][emoji_id] == 'undefined') {
 				var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
-				self.message_emoji_archive[message_id][emoji_code] = [];
-				self.message_emoji_archive[message_id][emoji_code][0] = user;
+				self.message_emoji_archive[message_id][emoji_id] = [];
+				self.message_emoji_archive[message_id][emoji_id][0] = user;
 			} else {
 				var user = {emoji_owner_id: emoji_owner_id, emoji_owner_name: emoji_owner_name};
-				var emoji_message_len = self.message_emoji_archive[message_id][emoji_code].length;
-				self.message_emoji_archive[message_id][emoji_code][emoji_message_len] = user;
+				var emoji_message_len = self.message_emoji_archive[message_id][emoji_id].length;
+				self.message_emoji_archive[message_id][emoji_id][emoji_message_len] = user;
 			}
+		},
+		_onUserDropEmoji: function(message, data) {
+			var message_id = data['message_id'];
+			var emoji_id = data['emoji_id'];
+			var emoji_owner_id = data['partner_id'];
+			var emoji_owner_name = data['emoji_owner_name']
+			this.update_emoji_archive(message_id, emoji_id, emoji_owner_id, emoji_owner_name);
+			this.render_emoji_for_message(message_id);
 		}
 		
 		
